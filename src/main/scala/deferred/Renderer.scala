@@ -27,124 +27,138 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
     this.d = d
   }
 
-  val sunDepthProgram = new ProgramF[(Float32Array)]("sunDepth") {
-    override def setUniforms(uniforms: (Float32Array)): Unit = {
-      val sunMatrixLocation = gl.getUniformLocation(program, "sunMatrix")
+  var mesh = new ObjVBO("test.obj")
+  val w = 1024
+  val h = 1024
+  val fbo = new FrameBuffer(w, h)
+  val sunDepth = fbo.createTexture(true)
+  val lambert = fbo.createTexture()
 
-      gl.enable(DEPTH_TEST)
-      gl.enable(CULL_FACE)
-      //      gl.cullFace(FRONT)
-      //      gl.polygonOffset(1, 1)
-      //      gl.enable(POLYGON_OFFSET_FILL)
-      val (sunMatrix) = uniforms
-      gl.uniformMatrix4fv(sunMatrixLocation, false, sunMatrix)
+  val sunDepthProgram = new FileProgram("sunDepth") {
+    var sunMatrix: Float32Array = null
+
+    def draw(sunMatrix: Float32Array): Unit = {
+      sunDepth.prepare
+      mesh.draw(this, () => {
+        val sunMatrixLocation = gl.getUniformLocation(program, "sunMatrix")
+
+        gl.enable(DEPTH_TEST)
+        gl.enable(CULL_FACE)
+        //      gl.cullFace(FRONT)
+        //      gl.polygonOffset(1, 1)
+        //      gl.enable(POLYGON_OFFSET_FILL)
+        gl.uniformMatrix4fv(sunMatrixLocation, false, sunMatrix)
+      })
     }
 
     //    override def unset(): Unit = gl.disable(POLYGON_OFFSET_FILL)
   }
 
-  val normalDepthProgram = new ProgramF[(Float32Array)]("normal") {
-    override def setUniforms(uniforms: (Float32Array)): Unit = {
-      val pvMatrixLocation = gl.getUniformLocation(program, "pvMatrix")
+  val lambertProgram = new FileProgram("lambert") {
+    var noShadow: Boolean = false
+    var sunDepthTexture: WebGLTexture = sunDepth.texture
+    var pvMatrix: Float32Array = null
+    var sunMatrix: Float32Array = null
+    var sunDirection: Vector3 = null
 
-      gl.enable(DEPTH_TEST)
-      gl.enable(CULL_FACE)
-      gl.cullFace(BACK)
-      val (pvMatrix) = uniforms
-      gl.uniformMatrix4fv(pvMatrixLocation, false, pvMatrix)
+    def draw(noShadow: Boolean, pvMatrix: Float32Array, sunMatrix: Float32Array, sunDirection: Vector3): Unit = {
+      lambert.prepare
+      mesh.draw(this, () => {
+        val noShadowLocation = gl.getUniformLocation(program, "noShadow")
+        val sunDepthLocation = gl.getUniformLocation(program, "sunDepth")
+        val pvMatrixLocation = gl.getUniformLocation(program, "pvMatrix")
+        val sunMatrixLocation = gl.getUniformLocation(program, "sunMatrix")
+        val sunDirectionLocation = gl.getUniformLocation(program, "sunDirection")
+
+        gl.enable(DEPTH_TEST)
+        gl.enable(CULL_FACE)
+        gl.cullFace(BACK)
+        gl.uniform1i(noShadowLocation, if (noShadow) 1 else 0)
+        gl.activeTexture(TEXTURE0)
+        gl.bindTexture(TEXTURE_2D, sunDepth.texture)
+        gl.uniform1i(sunDepthLocation, 0)
+        gl.uniformMatrix4fv(pvMatrixLocation, false, pvMatrix)
+        gl.uniformMatrix4fv(sunMatrixLocation, false, sunMatrix)
+        gl.uniform3fv(sunDirectionLocation, sunDirection.allocateBuffer)
+      })
     }
   }
 
-  val lambertProgram = new ProgramF[(Boolean, WebGLTexture, Float32Array, Float32Array, Vector3)]("lambert") {
-    override def setUniforms(uniforms: (Boolean, WebGLTexture, Float32Array, Float32Array, Vector3)): Unit = {
-      val noShadowLocation = gl.getUniformLocation(program, "noShadow")
-      val sunDepthLocation = gl.getUniformLocation(program, "sunDepth")
-      val pvMatrixLocation = gl.getUniformLocation(program, "pvMatrix")
-      val sunMatrixLocation = gl.getUniformLocation(program, "sunMatrix")
-      val sunDirectionLocation = gl.getUniformLocation(program, "sunDirection")
+  //  val normalDepthProgram = new ProgramF("normal") {
+  //    var pvMatrix: Float32Array = null
+  //
+  //    override def setUniforms = {
+  //      val pvMatrixLocation = gl.getUniformLocation(program, "pvMatrix")
+  //
+  //      gl.enable(DEPTH_TEST)
+  //      gl.enable(CULL_FACE)
+  //      gl.cullFace(BACK)
+  //      gl.uniformMatrix4fv(pvMatrixLocation, false, pvMatrix)
+  //    }
+  //  }
+  //
+  //  val sobelProgram = new ProgramF("tex2d3x3", "sobel") {
+  //    var texture: WebGLTexture = null
+  //
+  //    override def setUniforms = {
+  //      val textureLocation = gl.getUniformLocation(program, "texture")
+  //      val wf = gl.getUniformLocation(program, "imageWidthFactor")
+  //      val hf = gl.getUniformLocation(program, "imageHeightFactor")
+  //
+  //      gl.disable(DEPTH_TEST)
+  //      gl.activeTexture(TEXTURE0)
+  //      gl.bindTexture(TEXTURE_2D, texture)
+  //      gl.uniform1i(textureLocation, 0)
+  //      gl.uniform1f(wf, 1.0 / w)
+  //      gl.uniform1f(hf, 1.0 / h)
+  //    }
+  //  }
+  //
+  //  val blurredHProgram = new ProgramF("blurredH1", "blurred") {
+  //    var texture: WebGLTexture = null
+  //
+  //    override def setUniforms = {
+  //      val textureLocation = gl.getUniformLocation(program, "texture")
+  //
+  //      gl.disable(DEPTH_TEST)
+  //      gl.activeTexture(TEXTURE0)
+  //      gl.bindTexture(TEXTURE_2D, texture)
+  //      gl.uniform1i(textureLocation, 0)
+  //    }
+  //  }
+  //
+  //  val blurredVProgram = new ProgramF("blurredV1", "blurred") {
+  //    var texture: WebGLTexture = null
+  //
+  //    override def setUniforms = {
+  //      val textureLocation = gl.getUniformLocation(program, "texture")
+  //
+  //      gl.disable(DEPTH_TEST)
+  //      gl.activeTexture(TEXTURE0)
+  //      gl.bindTexture(TEXTURE_2D, texture)
+  //      gl.uniform1i(textureLocation, 0)
+  //    }
+  //  }
+  //
+  //  val composeProgram = new ProgramF("tex2d", "compose") {
+  //    var normalTexture: WebGLTexture = null
+  //    var depthTexture: WebGLTexture = null
+  //
+  //    override def setUniforms = {
+  //      val normalTextureLocation = gl.getUniformLocation(program, "normalTexture")
+  //      val depthTextureLocation = gl.getUniformLocation(program, "depthTexture")
+  //
+  //      gl.disable(DEPTH_TEST)
+  //      gl.activeTexture(TEXTURE0)
+  //      gl.bindTexture(TEXTURE_2D, normalTexture)
+  //      gl.uniform1i(normalTextureLocation, 0)
+  //      gl.activeTexture(TEXTURE1)
+  //      gl.bindTexture(TEXTURE_2D, depthTexture)
+  //      gl.uniform1i(depthTextureLocation, 1)
+  //    }
+  //  }
 
-      gl.enable(DEPTH_TEST)
-      gl.enable(CULL_FACE)
-      gl.cullFace(BACK)
-      val (noShadow, sunDepthTexture, pvMatrix, sunMatrix, sunDirection) = uniforms
-      gl.uniform1i(noShadowLocation, if (noShadow) 1 else 0)
-      gl.activeTexture(TEXTURE0)
-      gl.bindTexture(TEXTURE_2D, sunDepthTexture)
-      gl.uniform1i(sunDepthLocation, 0)
-      gl.uniformMatrix4fv(pvMatrixLocation, false, pvMatrix)
-      gl.uniformMatrix4fv(sunMatrixLocation, false, sunMatrix)
-      gl.uniform3fv(sunDirectionLocation, sunDirection.allocateBuffer)
-    }
-  }
-
-  val sobelProgram = new ProgramF[(WebGLTexture)]("tex2d3x3", "sobel") {
-    override def setUniforms(uniforms: (WebGLTexture)): Unit = {
-      val textureLocation = gl.getUniformLocation(program, "texture")
-      val wf = gl.getUniformLocation(program, "imageWidthFactor")
-      val hf = gl.getUniformLocation(program, "imageHeightFactor")
-
-      val (texture) = uniforms
-      gl.disable(DEPTH_TEST)
-      gl.activeTexture(TEXTURE0)
-      gl.bindTexture(TEXTURE_2D, texture)
-      gl.uniform1i(textureLocation, 0)
-      gl.uniform1f(wf, 1.0 / w)
-      gl.uniform1f(hf, 1.0 / h)
-    }
-  }
-
-  val blurredHProgram = new ProgramF[(WebGLTexture)]("blurredH1", "blurred") {
-    override def setUniforms(uniforms: (WebGLTexture)): Unit = {
-      val textureLocation = gl.getUniformLocation(program, "texture")
-
-      val (texture) = uniforms
-      gl.disable(DEPTH_TEST)
-      gl.activeTexture(TEXTURE0)
-      gl.bindTexture(TEXTURE_2D, texture)
-      gl.uniform1i(textureLocation, 0)
-    }
-  }
-
-  val blurredVProgram = new ProgramF[(WebGLTexture)]("blurredV1", "blurred") {
-    override def setUniforms(uniforms: (WebGLTexture)): Unit = {
-      val textureLocation = gl.getUniformLocation(program, "texture")
-
-      val (texture) = uniforms
-      gl.disable(DEPTH_TEST)
-      gl.activeTexture(TEXTURE0)
-      gl.bindTexture(TEXTURE_2D, texture)
-      gl.uniform1i(textureLocation, 0)
-    }
-  }
-
-  val composeProgram = new ProgramF[(WebGLTexture, WebGLTexture)]("tex2d", "compose") {
-    override def setUniforms(uniforms: (WebGLTexture, WebGLTexture)): Unit = {
-      val normalTextureLocation = gl.getUniformLocation(program, "normalTexture")
-      val depthTextureLocation = gl.getUniformLocation(program, "depthTexture")
-
-      val (normalTexture, depthTexture) = uniforms
-      gl.disable(DEPTH_TEST)
-      gl.activeTexture(TEXTURE0)
-      gl.bindTexture(TEXTURE_2D, normalTexture)
-      gl.uniform1i(normalTextureLocation, 0)
-      gl.activeTexture(TEXTURE1)
-      gl.bindTexture(TEXTURE_2D, depthTexture)
-      gl.uniform1i(depthTextureLocation, 1)
-    }
-  }
-
-  var mesh = new ObjVBO("test.obj")
-  val w = 1024
-  val h = 1024
-  val fbo = new FrameBuffer(w, h)
-  val normalStage = fbo.addStage(normalDepthProgram, mesh)
-  val sunDepthStage = fbo.addStage(sunDepthProgram, mesh, true)
-  val lambertStage = fbo.addStage(lambertProgram, mesh)
   val textBlt = new TexBlt()
-  val depthStage = fbo.addStage(sobelProgram, textBlt.square)
-  val blurredHStage = fbo.addStage(blurredHProgram, textBlt.square)
-  val blurredVStage = fbo.addStage(blurredVProgram, textBlt.square)
-  val compositeStage = fbo.addStage(composeProgram, textBlt.square)
 
   def render(width: Int, height: Int, newActions: Set[String], allActions: Set[String]): Unit = {
     if (allActions.contains("up")) a -= 0.1f
@@ -171,20 +185,19 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
     val k = 10
     val sunMatrix = (Matrix4x4.forOrtho(-k * aspect, k * aspect, -k, k, -k, k) * sunViewMatrix).allocateBuffer
 
-    val sunDepthTex = sunDepthStage.draw((sunMatrix))
-    val lambertTex = lambertStage.draw((noShadow, sunDepthTex,
-      pvMatrix, sunMatrix,
-      Vector3(sunViewMatrix.c0r2, sunViewMatrix.c1r2, sunViewMatrix.c2r2)))
-//    val normalTex = normalStage.draw((pvMatrix))
-//    val depthTex = depthStage.draw((normalTex))
-//    val blurredHTex = blurredHStage.draw((depthTex))
-//    val blurredTex = blurredVStage.draw((blurredHTex))
-//    val compositeTex = compositeStage.draw((lambertTex, blurredTex))
+    sunDepthProgram.draw(sunMatrix)
+    lambertProgram.draw(noShadow, pvMatrix, sunMatrix, Vector3(sunViewMatrix.c0r2, sunViewMatrix.c1r2, sunViewMatrix.c2r2))
+
+    //    val normalTex = normalStage.draw((pvMatrix))
+    //    val depthTex = depthStage.draw((normalTex))
+    //    val blurredHTex = blurredHStage.draw((depthTex))
+    //    val blurredTex = blurredVStage.draw((blurredHTex))
+    //    val compositeTex = compositeStage.draw((lambertTex, blurredTex))
 
     val ws = w / 2
     val hs = h / 2
-    textBlt.blt(sunDepthTex, width - ws, height - hs, ws, hs)
-    textBlt.blt(lambertTex, 0, 0, w, h)
+    textBlt.blt(sunDepth.texture, width - ws, height - hs, ws, hs)
+    textBlt.blt(lambert.texture, 0, 0, w, h)
     //    textBlt.blt(blurredTex, width - ws, 0, ws, hs)
     //    textBlt.blt(compositeTex, 0, 0, ws, hs)
   }

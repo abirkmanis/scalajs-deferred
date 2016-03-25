@@ -1,7 +1,6 @@
 package deferred
 
 import org.scalajs.dom._
-import org.scalajs.dom.raw.WebGLProgram
 import org.scalajs.dom.raw.WebGLRenderingContext._
 
 import scala.scalajs.js.typedarray.{Float32Array, Int16Array}
@@ -9,7 +8,7 @@ import scala.scalajs.js.typedarray.{Float32Array, Int16Array}
 case class Attribute(name: String, offset: Int, size: Int)
 
 trait DrawBuffer {
-  def draw(program: WebGLProgram)
+  def draw(program: Program, setUniforms: () => Unit): Unit
 }
 
 class VBO(values: Float32Array, sizes: Seq[(String, Int)])(implicit val gl: raw.WebGLRenderingContext) extends DrawBuffer {
@@ -22,11 +21,14 @@ class VBO(values: Float32Array, sizes: Seq[(String, Int)])(implicit val gl: raw.
   val offsets = sizesValues.scanLeft(0) { case (o, s) => o + s }
   val attributes = sizes.zip(offsets).map { case ((n, s), o) => Attribute(n, o, s) }
 
-  def draw(program: WebGLProgram) = {
+  def draw(program: Program, setUniforms: () => Unit): Unit = {
+    if (program.program == null) return
+    gl.useProgram(program.program)
+    setUniforms()
     // todo: optimize
     gl.bindBuffer(ARRAY_BUFFER, buffer)
     attributes.foreach { a =>
-      val location = gl.getAttribLocation(program, a.name)
+      val location = program.getAttribLocation(a.name)
       if (location >= 0) {
         gl.vertexAttribPointer(location, a.size, FLOAT, false, stride * 4, a.offset * 4)
         gl.enableVertexAttribArray(location)
@@ -34,10 +36,11 @@ class VBO(values: Float32Array, sizes: Seq[(String, Int)])(implicit val gl: raw.
     }
     drawCall
     attributes.foreach { a =>
-      val location = gl.getAttribLocation(program, a.name)
+      val location = program.getAttribLocation(a.name)
       if (location >= 0)
         gl.disableVertexAttribArray(location)
     }
+    program.unset()
   }
 
   def drawCall = gl.drawArrays(TRIANGLES, 0, count)
@@ -59,7 +62,7 @@ class ObjVBO(name: String)(implicit val gl: raw.WebGLRenderingContext) extends D
   var inner = null.asInstanceOf[VBO]
   ObjReader.load(name, { v => inner = v })
 
-  override def draw(program: WebGLProgram): Unit = {
-    if (inner != null) inner.draw(program)
+  override def draw(program: Program, setUniforms: () => Unit): Unit = {
+    if (inner != null) inner.draw(program, setUniforms: () => Unit)
   }
 }
