@@ -3,9 +3,9 @@ package deferred
 import deferred.Implicits._
 import org.scalajs.dom.raw
 import org.scalajs.dom.raw.WebGLRenderingContext._
-import org.scalajs.dom.raw.WebGLTexture
 import subspace.{Matrix4x4, Quaternion, Vector3}
 
+import scala.scalajs.js
 import scala.scalajs.js.typedarray.Float32Array
 
 class Renderer(implicit val gl: raw.WebGLRenderingContext) {
@@ -31,13 +31,12 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
   val w = 1024
   val h = 1024
   val fbo = new FrameBuffer(w, h)
-  // todo: embed texture into its program
-  val sunDepth = fbo.createTexture(true)
-  val lambert = fbo.createTexture()
 
   val sunDepthProgram = new FileProgram("sunDepth") {
+    val output = fbo.createTexture(true)
+
     def draw(sunMatrix: Float32Array): Unit = {
-      sunDepth.prepare()
+      output.prepare()
       mesh.draw(this, () => {
         val sunMatrixLocation = gl.getUniformLocation(program, "sunMatrix")
 
@@ -48,18 +47,34 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
         //      gl.enable(POLYGON_OFFSET_FILL)
         gl.uniformMatrix4fv(sunMatrixLocation, false, sunMatrix)
       })
-      sunDepth.genMipMap()
+      output.genMipMap()
     }
 
     //    override def unset(): Unit = gl.disable(POLYGON_OFFSET_FILL)
   }
 
+  val anisotropic = gl.getExtension("EXT_texture_filter_anisotropic")
+  if (anisotropic != null)
+    println("Max anisotropy: " + gl.getParameter(anisotropic.asInstanceOf[js.Dynamic].MAX_TEXTURE_MAX_ANISOTROPY_EXT.asInstanceOf[Int]))
+  else
+    println("Anisotropic filtering is not supported")
+
+  def setAnisotropic(a: Int) = {
+    if (anisotropic != null)
+      gl.texParameterf(TEXTURE_2D, anisotropic.asInstanceOf[js.Dynamic].TEXTURE_MAX_ANISOTROPY_EXT.asInstanceOf[Int], a)
+  }
+
+  val rainbow = RainbowMipMap.createTexture(1024, 0)
+
   val lambertProgram = new FileProgram("lambert") {
+    val output = fbo.createTexture()
+
     def draw(noShadow: Boolean, pvMatrix: Float32Array, sunMatrix: Float32Array, sunDirection: Vector3): Unit = {
-      lambert.prepare()
+      output.prepare()
       mesh.draw(this, () => {
         val noShadowLocation = gl.getUniformLocation(program, "noShadow")
         val sunDepthLocation = gl.getUniformLocation(program, "sunDepth")
+        val rainbowLocation = gl.getUniformLocation(program, "rainbow")
         val pvMatrixLocation = gl.getUniformLocation(program, "pvMatrix")
         val sunMatrixLocation = gl.getUniformLocation(program, "sunMatrix")
         val sunDirectionLocation = gl.getUniformLocation(program, "sunDirection")
@@ -67,10 +82,15 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
         gl.enable(DEPTH_TEST)
         gl.enable(CULL_FACE)
         gl.cullFace(BACK)
-        gl.uniform1i(noShadowLocation, 0)
+        gl.uniform1i(noShadowLocation, if (noShadow) 1 else 0)
         gl.activeTexture(TEXTURE0)
-        gl.bindTexture(TEXTURE_2D, sunDepth.texture)
+        gl.bindTexture(TEXTURE_2D, sunDepthProgram.output.texture)
         gl.uniform1i(sunDepthLocation, 0)
+        setAnisotropic(16)
+        gl.activeTexture(TEXTURE1)
+        gl.bindTexture(TEXTURE_2D, rainbow)
+        gl.uniform1i(rainbowLocation, 1)
+        setAnisotropic(16)
         gl.uniformMatrix4fv(pvMatrixLocation, false, pvMatrix)
         gl.uniformMatrix4fv(sunMatrixLocation, false, sunMatrix)
         gl.uniform3fv(sunDirectionLocation, sunDirection.allocateBuffer)
@@ -190,9 +210,8 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
 
     val ws = w / 2
     val hs = h / 2
-    textBlt.blt(sunDepth.texture, width - ws, height - hs, ws, hs, 0f)
-    textBlt.blt(sunDepth.texture, width - ws, height - 2 * hs, ws, hs, 5)
-    textBlt.blt(lambert.texture, 0, 0, w, h)
+    textBlt.blt(sunDepthProgram.output.texture, width - ws, height - hs, ws, hs, 1)
+    textBlt.blt(lambertProgram.output.texture, 0, 0, w, h)
     //    textBlt.blt(blurredTex, width - ws, 0, ws, hs)
     //    textBlt.blt(compositeTex, 0, 0, ws, hs)
   }

@@ -8,8 +8,8 @@ class TexBlt(implicit val gl: raw.WebGLRenderingContext) {
 
   import Implicits._
 
-  gl.getExtension("EXT_shader_texture_lod")
-  val program2dTex = new FileProgram("tex2d", "blt") {
+  val useLOD = gl.getExtension("EXT_shader_texture_lod") != null
+  val program2dTex = new FileProgram("tex2d", if (useLOD) "bltLOD" else "blt") {
     val square = new VAO(Seq(
       -1f, -1f,
       1f, -1f,
@@ -20,14 +20,13 @@ class TexBlt(implicit val gl: raw.WebGLRenderingContext) {
     def draw(tex: WebGLTexture, lod: Float) = {
       square.draw(this, () => {
         val textureLocation = gl.getUniformLocation(program, "texture")
-        val lodLocation = gl.getUniformLocation(program, "lod")
 
         gl.disable(DEPTH_TEST)
         gl.activeTexture(TEXTURE0)
         gl.bindTexture(TEXTURE_2D, tex)
-//        gl.texParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, LINEAR)
         gl.uniform1i(textureLocation, 0)
-        gl.uniform1f(lodLocation, lod)
+        if (useLOD)
+          gl.uniform1f(gl.getUniformLocation(program, "lod"), lod)
       })
     }
   }
