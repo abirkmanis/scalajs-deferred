@@ -3,7 +3,7 @@ varying float vDot;
 uniform sampler2D sunDepth;
 uniform sampler2D rainbow;
 varying vec3 vSunPosition;
-uniform int noShadow;
+uniform int special;
 
 void main(){
     vec2 moments = texture2D(sunDepth, vSunPosition.xy).xy;
@@ -17,7 +17,7 @@ void main(){
     float pmax = var/(var+d*d);
     pmax = smoothstep(0.9,1.0,pmax);
     pmax = max(pmax, float(t <= mean));
-    if (noShadow > 0){
+    if (special > 0){
         gl_FragColor = vec4(texture2D(rainbow, vSunPosition.xy).rgb, 1.0);
     }
     else

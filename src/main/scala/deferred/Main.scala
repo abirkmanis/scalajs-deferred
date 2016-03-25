@@ -1,10 +1,10 @@
 package deferred
 
 import org.scalajs.dom._
+import org.scalajs.dom.ext.KeyCode
 import org.scalajs.dom.raw.UIEvent
 
 import scala.collection.mutable
-import scala.scalajs.js
 import scala.scalajs.js.JSApp
 import scala.scalajs.js.annotation.JSExport
 
@@ -17,11 +17,11 @@ object Main extends JSApp {
     //    console.log(gl.getParameter(VERSION))
     //    console.log(gl.getParameter(SHADING_LANGUAGE_VERSION))
     //    console.log(gl.getParameter(VENDOR))
-//    val ext = gl.getExtension("WEBGL_debug_renderer_info")
-//    if (ext != null) {
-//      console.log(gl.getParameter(ext.asInstanceOf[js.Dynamic].UNMASKED_VENDOR_WEBGL.asInstanceOf[Int]))
-//      console.log(gl.getParameter(ext.asInstanceOf[js.Dynamic].UNMASKED_RENDERER_WEBGL.asInstanceOf[Int]))
-//    }
+    //    val ext = gl.getExtension("WEBGL_debug_renderer_info")
+    //    if (ext != null) {
+    //      console.log(gl.getParameter(ext.asInstanceOf[js.Dynamic].UNMASKED_VENDOR_WEBGL.asInstanceOf[Int]))
+    //      console.log(gl.getParameter(ext.asInstanceOf[js.Dynamic].UNMASKED_RENDERER_WEBGL.asInstanceOf[Int]))
+    //    }
     //    console.log(gl.getContextAttributes())
     console.log(gl.getSupportedExtensions())
 
@@ -38,10 +38,10 @@ object Main extends JSApp {
       val handledCommands = new mutable.HashSet[String]()
 
       {
-        val codesToCommands = Map(87 -> "up", 65 -> "left", 83 -> "down", 68 -> "right",
-          38 -> "up2", 37 -> "left2", 40 -> "down2", 39 -> "right2", 32 -> "shadow")
+        val codesToCommands = Map(KeyCode.W -> "up", KeyCode.A -> "left", KeyCode.S -> "down", KeyCode.D -> "right",
+          KeyCode.Up -> "up2", KeyCode.Left -> "left2", KeyCode.Down -> "down2", KeyCode.Right -> "right2", KeyCode.Space -> "special")
         document.onkeydown = { e: KeyboardEvent =>
-//          console.log(e.keyCode)
+          //          console.log(e.keyCode)
           val command = codesToCommands.getOrElse(e.keyCode, "")
           activeCommands += command
         }
@@ -61,8 +61,8 @@ object Main extends JSApp {
 
     val renderer = new Renderer()
     val cookie = window.localStorage.getItem("test")
-    window.onbeforeunload = {e : BeforeUnloadEvent => window.localStorage.setItem("test", renderer.save())}
-    if (cookie!=null)
+    window.onbeforeunload = { e: BeforeUnloadEvent => window.localStorage.setItem("test", renderer.save()) }
+    if (cookie != null)
       renderer.load(cookie)
 
     def requestAnimation(): Unit = {

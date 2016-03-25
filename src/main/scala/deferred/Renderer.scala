@@ -69,10 +69,10 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
   val lambertProgram = new FileProgram("lambert") {
     val output = fbo.createTexture()
 
-    def draw(noShadow: Boolean, pvMatrix: Float32Array, sunMatrix: Float32Array, sunDirection: Vector3): Unit = {
+    def draw(special: Boolean, pvMatrix: Float32Array, sunMatrix: Float32Array, sunDirection: Vector3): Unit = {
       output.prepare()
       mesh.draw(this, () => {
-        val noShadowLocation = gl.getUniformLocation(program, "noShadow")
+        val specialLocation = gl.getUniformLocation(program, "special")
         val sunDepthLocation = gl.getUniformLocation(program, "sunDepth")
         val rainbowLocation = gl.getUniformLocation(program, "rainbow")
         val pvMatrixLocation = gl.getUniformLocation(program, "pvMatrix")
@@ -82,7 +82,7 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
         gl.enable(DEPTH_TEST)
         gl.enable(CULL_FACE)
         gl.cullFace(BACK)
-        gl.uniform1i(noShadowLocation, if (noShadow) 1 else 0)
+        gl.uniform1i(specialLocation, if (special) 1 else 0)
         gl.activeTexture(TEXTURE0)
         gl.bindTexture(TEXTURE_2D, sunDepthProgram.output.texture)
         gl.uniform1i(sunDepthLocation, 0)
@@ -185,7 +185,7 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
     if (allActions.contains("left2")) d += 0.1f
     if (allActions.contains("right2")) d -= 0.1f
 
-    val noShadow = allActions.contains("shadow")
+    val special = allActions.contains("special")
 
     val eyeRot = Quaternion.forAxisAngle(Vector3(1, 0, 0), a) * Quaternion.forAxisAngle(Vector3(0, 0, 1), b)
     val sunRot = Quaternion.forAxisAngle(Vector3(1, 0, 0), c) * Quaternion.forAxisAngle(Vector3(0, 0, 1), d)
@@ -200,7 +200,7 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
     val sunMatrix = (Matrix4x4.forOrtho(-k * aspect, k * aspect, -k, k, -k, k) * sunViewMatrix).allocateBuffer
 
     sunDepthProgram.draw(sunMatrix)
-    lambertProgram.draw(noShadow, pvMatrix, sunMatrix, Vector3(sunViewMatrix.c0r2, sunViewMatrix.c1r2, sunViewMatrix.c2r2))
+    lambertProgram.draw(special, pvMatrix, sunMatrix, Vector3(sunViewMatrix.c0r2, sunViewMatrix.c1r2, sunViewMatrix.c2r2))
 
     //    val normalTex = normalStage.draw((pvMatrix))
     //    val depthTex = depthStage.draw((normalTex))
