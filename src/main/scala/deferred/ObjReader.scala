@@ -1,12 +1,10 @@
 package deferred
 
-import org.scalajs.dom.raw.WebGLRenderingContext._
-import org.scalajs.dom.raw.{WebGLBuffer, XMLHttpRequest}
+import org.scalajs.dom.raw.XMLHttpRequest
 import org.scalajs.dom.{Event, raw}
 
 import scala.collection.mutable
 import scala.scalajs.js.RegExp
-import scala.scalajs.js.typedarray.Float32Array
 
 object ObjReader {
   val vertexPattern = RegExp("^v\\s+([\\d|\\.|\\+|\\-|e|E]+)\\s+([\\d|\\.|\\+|\\-|e|E]+)\\s+([\\d|\\.|\\+|\\-|e|E]+)")
@@ -14,7 +12,7 @@ object ObjReader {
   //  val facePattern1 = RegExp("^f\\s+(-?\\d+)\\s+(-?\\d+)\\s+(-?\\d+)(?:\\s+(-?\\d+))?")
   val facePattern = RegExp("^f\\s+(\\d+)\\/\\/(\\d+)\\s+(\\d+)\\/\\/(\\d+)\\s+(\\d+)\\/\\/(\\d+)(?:\\s+(\\d+)\\/\\/(\\d+))?")
 
-  def load(name: String, callback: (WebGLBuffer, Int) => Unit)(implicit gl: raw.WebGLRenderingContext) = {
+  def load(name: String, callback: VBO => Unit)(implicit gl: raw.WebGLRenderingContext) = {
     val xhr = new XMLHttpRequest()
 
     xhr.onload = { (e: Event) =>
@@ -60,15 +58,11 @@ object ObjReader {
           }
         }
 
-        val values = new Float32Array(attributes.size)
-        attributes.zipWithIndex.foreach { case (a, i) => values(i) = a }
-
-        val vbo = gl.createBuffer()
-        gl.bindBuffer(ARRAY_BUFFER, vbo)
-        gl.bufferData(ARRAY_BUFFER, values, STATIC_DRAW)
+        import Implicits._
+        val vbo = new VBO(attributes, Seq("position" -> 3, "normal" -> 3))
         println(s"${positions.size / 3} positions, ${normals.size / 3} normals, ${attributes.size} floats, ${attributes.size / 6} vertices")
         // todo: provide indices
-        callback(vbo, attributes.size / 6)
+        callback(vbo)
       }
     }
     xhr.open("GET",

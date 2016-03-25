@@ -1,11 +1,27 @@
 package deferred
 
-import java.nio.FloatBuffer
+import java.nio.{ShortBuffer, ByteBuffer, ByteOrder, FloatBuffer}
 
-import scala.scalajs.js.typedarray.{Float32Array, TypedArrayBufferOps}
+import scala.scalajs.js.typedarray.{Float32Array, Int16Array, TypedArrayBufferOps}
 
 object Implicits {
-  implicit def toTypedArray(buffer: FloatBuffer) = TypedArrayBufferOps.floatBufferOps(buffer).typedArray()
+  implicit def toTypedArray(buffer: FloatBuffer): Float32Array = TypedArrayBufferOps.floatBufferOps(buffer).typedArray()
+
+  implicit def toTypedArray1(seq: Seq[Float]): Float32Array = {
+    val sizeInBytes = seq.size << 2
+    val b = ByteBuffer.allocateDirect(sizeInBytes).order(ByteOrder.nativeOrder).asFloatBuffer()
+    seq.foreach(b.put)
+    toTypedArray(b)
+  }
+
+  implicit def toTypedArray(buffer: ShortBuffer): Int16Array = TypedArrayBufferOps.shortBufferOps(buffer).typedArray()
+
+  implicit def toTypedArray2(seq: Seq[Int]): Int16Array = {
+    val sizeInBytes = seq.size << 1
+    val b = ByteBuffer.allocateDirect(sizeInBytes).order(ByteOrder.nativeOrder).asShortBuffer()
+    seq.foreach { i => b.put(i.toShort) }
+    toTypedArray(b)
+  }
 }
 
 class Matrix4() {
