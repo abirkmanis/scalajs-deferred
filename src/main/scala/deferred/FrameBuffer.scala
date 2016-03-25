@@ -7,7 +7,12 @@ import org.scalajs.dom.raw.WebGLTexture
 class FrameBuffer(val w: Int, val h: Int)(implicit val gl: raw.WebGLRenderingContext) {
 
   case class Texture(val texture: WebGLTexture, val mipMap: Boolean) {
-    def prepare = {
+    def genMipMap(): Unit = {
+      gl.bindTexture(TEXTURE_2D, texture)
+      gl.generateMipmap(TEXTURE_2D)
+    }
+
+    def prepare() = {
       gl.bindFramebuffer(FRAMEBUFFER, fb)
       gl.framebufferTexture2D(FRAMEBUFFER, COLOR_ATTACHMENT0, TEXTURE_2D, texture, 0)
       // todo: make depth optional
@@ -16,9 +21,6 @@ class FrameBuffer(val w: Int, val h: Int)(implicit val gl: raw.WebGLRenderingCon
       gl.clearColor(0.0, 0.0, 0.0, 0.0)
       gl.clear(COLOR_BUFFER_BIT | DEPTH_BUFFER_BIT)
       gl.viewport(0, 0, w, h)
-      gl.bindTexture(TEXTURE_2D, texture)
-      if (mipMap)
-        gl.texParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, LINEAR_MIPMAP_LINEAR)
     }
   }
 
@@ -40,9 +42,6 @@ class FrameBuffer(val w: Int, val h: Int)(implicit val gl: raw.WebGLRenderingCon
     gl.texParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, LINEAR)
     gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_S, CLAMP_TO_EDGE)
     gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_T, CLAMP_TO_EDGE)
-
-    if (mipMap)
-      gl.generateMipmap(TEXTURE_2D)
 
     Texture(tex, mipMap)
   }

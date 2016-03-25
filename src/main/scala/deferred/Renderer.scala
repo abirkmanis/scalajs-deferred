@@ -31,14 +31,13 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
   val w = 1024
   val h = 1024
   val fbo = new FrameBuffer(w, h)
+  // todo: embed texture into its program
   val sunDepth = fbo.createTexture(true)
   val lambert = fbo.createTexture()
 
   val sunDepthProgram = new FileProgram("sunDepth") {
-    var sunMatrix: Float32Array = null
-
     def draw(sunMatrix: Float32Array): Unit = {
-      sunDepth.prepare
+      sunDepth.prepare()
       mesh.draw(this, () => {
         val sunMatrixLocation = gl.getUniformLocation(program, "sunMatrix")
 
@@ -49,20 +48,15 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
         //      gl.enable(POLYGON_OFFSET_FILL)
         gl.uniformMatrix4fv(sunMatrixLocation, false, sunMatrix)
       })
+      sunDepth.genMipMap()
     }
 
     //    override def unset(): Unit = gl.disable(POLYGON_OFFSET_FILL)
   }
 
   val lambertProgram = new FileProgram("lambert") {
-    var noShadow: Boolean = false
-    var sunDepthTexture: WebGLTexture = sunDepth.texture
-    var pvMatrix: Float32Array = null
-    var sunMatrix: Float32Array = null
-    var sunDirection: Vector3 = null
-
     def draw(noShadow: Boolean, pvMatrix: Float32Array, sunMatrix: Float32Array, sunDirection: Vector3): Unit = {
-      lambert.prepare
+      lambert.prepare()
       mesh.draw(this, () => {
         val noShadowLocation = gl.getUniformLocation(program, "noShadow")
         val sunDepthLocation = gl.getUniformLocation(program, "sunDepth")
@@ -73,7 +67,7 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
         gl.enable(DEPTH_TEST)
         gl.enable(CULL_FACE)
         gl.cullFace(BACK)
-        gl.uniform1i(noShadowLocation, if (noShadow) 1 else 0)
+        gl.uniform1i(noShadowLocation, 0)
         gl.activeTexture(TEXTURE0)
         gl.bindTexture(TEXTURE_2D, sunDepth.texture)
         gl.uniform1i(sunDepthLocation, 0)
@@ -196,7 +190,8 @@ class Renderer(implicit val gl: raw.WebGLRenderingContext) {
 
     val ws = w / 2
     val hs = h / 2
-    textBlt.blt(sunDepth.texture, width - ws, height - hs, ws, hs)
+    textBlt.blt(sunDepth.texture, width - ws, height - hs, ws, hs, 0f)
+    textBlt.blt(sunDepth.texture, width - ws, height - 2 * hs, ws, hs, 5)
     textBlt.blt(lambert.texture, 0, 0, w, h)
     //    textBlt.blt(blurredTex, width - ws, 0, ws, hs)
     //    textBlt.blt(compositeTex, 0, 0, ws, hs)

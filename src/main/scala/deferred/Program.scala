@@ -9,8 +9,6 @@ trait Program {
 
   def program: WebGLProgram
 
-//  def setUniforms(): Unit = {}
-
   def unset(): Unit = {}
 }
 
@@ -24,6 +22,7 @@ class LiteralProgram(vertex: String, fragment: String)(implicit val gl: raw.WebG
   gl.compileShader(fShader)
 
   val program = gl.createProgram()
+
   gl.attachShader(program, vShader)
   gl.attachShader(program, fShader)
   gl.linkProgram(program)
